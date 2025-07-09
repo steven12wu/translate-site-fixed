@@ -1,4 +1,3 @@
-
 export default async function handler(req, res) {
   const { text } = req.body;
   try {
@@ -10,11 +9,18 @@ export default async function handler(req, res) {
       },
       body: JSON.stringify({
         model: 'gpt-4o',
-        messages: [{ role: 'user', content: `請將下列日文翻譯成中文：\n${text}` }],
+        messages: [{ role: 'user', content: `請將下列日文翻譯成中文：\\n${text}` }],
         temperature: 0.5
       })
     });
+
     const data = await response.json();
+
+    if (!data.choices || !data.choices[0]) {
+      const errMsg = data.error?.message || 'OpenAI 回傳錯誤';
+      return res.status(500).json({ error: '翻譯失敗：' + errMsg });
+    }
+
     res.status(200).json({ translation: data.choices[0].message.content.trim() });
   } catch (err) {
     res.status(500).json({ error: '翻譯失敗：' + err.message });
