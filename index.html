@@ -1,0 +1,66 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>即時鏡頭翻譯</title>
+  <style>
+    video, canvas {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%;
+      height: auto;
+    }
+    #overlay {
+      position: absolute;
+      top: 0; left: 0;
+      color: red;
+      font-size: 24px;
+      font-weight: bold;
+      pointer-events: none;
+      white-space: pre-wrap;
+      text-shadow: 1px 1px 2px white;
+    }
+  </style>
+</head>
+<body>
+  <video id="video" autoplay muted playsinline></video>
+  <canvas id="canvas" style="display: none;"></canvas>
+  <div id="overlay"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@2.1.5/dist/tesseract.min.js"></script>
+  <script>
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('canvas');
+    const overlay = document.getElementById('overlay');
+    let lastText = '';
+
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } }).then(stream => {
+      video.srcObject = stream;
+    });
+
+    async function processFrame() {
+      const ctx = canvas.getContext('2d');
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+      const result = await Tesseract.recognize(canvas, 'jpn');
+      const currentText = result.data.text.trim();
+
+      if (currentText && currentText !== lastText) {
+        lastText = currentText;
+        const response = await fetch('/api/translate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: currentText })
+        });
+        const data = await response.json();
+        overlay.innerText = data.translation;
+      }
+    }
+
+    setInterval(processFrame, 1000);
+  </script>
+</body>
+</html>
