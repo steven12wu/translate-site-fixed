@@ -2,7 +2,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
   <title>即時鏡頭翻譯</title>
   <style>
     video, canvas {
@@ -25,8 +25,8 @@
 </head>
 <body>
   <video id="video" autoplay muted playsinline></video>
-  <canvas id="canvas" style="display: none;"></canvas>
-  <div id="overlay"></div>
+  <canvas id="canvas" style="display:none;"></canvas>
+  <div id="overlay">正在辨識文字...</div>
 
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@2.1.5/dist/tesseract.min.js"></script>
   <script>
@@ -35,31 +35,42 @@
     const overlay = document.getElementById('overlay');
     let lastText = '';
 
-    navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } }).then(stream => {
-      video.srcObject = stream;
-    });
-
-    async function processFrame() {
-      const ctx = canvas.getContext('2d');
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-      const result = await Tesseract.recognize(canvas, 'jpn');
-      const currentText = result.data.text.trim();
-
-      if (currentText && currentText !== lastText) {
-        lastText = currentText;
-        const response = await fetch('/api/translate', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text: currentText })
-        });
-        const data = await response.json();
-        overlay.innerText = data.translation;
+    async function startCamera() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        video.srcObject = stream;
+      } catch (e) {
+        overlay.innerText = '無法啟用鏡頭：' + e.message;
       }
     }
 
+    async function processFrame() {
+      try {
+        const ctx = canvas.getContext('2d');
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+        const result = await Tesseract.recognize(canvas, 'jpn');
+        const currentText = result.data.text.trim();
+
+        if (currentText && currentText !== lastText) {
+          lastText = currentText;
+          overlay.innerText = '翻譯中...';
+          const response = await fetch('/api/translate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text: currentText })
+          });
+          const data = await response.json();
+          overlay.innerText = data.translation;
+        }
+      } catch (err) {
+        overlay.innerText = '辨識錯誤：' + err.message;
+      }
+    }
+
+    startCamera();
     setInterval(processFrame, 1000);
   </script>
 </body>
